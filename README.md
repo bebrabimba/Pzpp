@@ -13,16 +13,16 @@ Użytkownicy mogą wyszukiwać muzykę na podstawie wykonawcy, albumu lub gatunk
 Wymagania niefunkcjonalne:
 - Intuicyjność interfejsu
 - Responsywność UI
-- Silnik Audio (plugin)
+- Silnik Audio (plugin): AxWMPLib.AxWindowsMediaPlayer 
+
 
 Biblioteka:
-
 - Vivaldi (The Four Seasons)
-- Pink Floyd ( 1967 The Piper at the Gates of Dawn - ... - 2014 The Endless River)
+- Pink Floyd (1967 The Piper at the Gates of Dawn - ... - 2014 The Endless River)
 - Queen (1973 Queen - ... 1995 Made in Heaven)
 - Modern Talking (1985 Let's Talk About Love - ... - 2003 Universe)
 - ABBA (1973 Ring, Ring - ...)
 - Silent Circle (1986 No. 1 - ... 1998 Stories 'Bout Love)
-- Sabaton (2000 Fist For Fight ... 2022 The War to End All Wars)
+- Sabaton (2000 Fist For Fight - ... - 2022 The War to End All Wars)
 
 ...
