@@ -14,3 +14,12 @@ Wymagania niefunkcjonalne:
 - Intuicyjność interfejsu
 - Responsywność UI
 - Silnik Audio (plugin)
+
+Biblioteka:
+
+- Vivaldi (The Four Seasons)
+- Pink Floyd ( 1967 The Piper at the Gates of Dawn - ... - 2014 The Endless River)
+- Queen (1973 Queen - ... 1995 Made in Heaven)
+- Modern Talking (1985 Let's Talk About Love - ... - 2003 Universe)
+- ABBA (1973 Ring, Ring - ...)
+- 
