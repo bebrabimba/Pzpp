@@ -75,9 +75,48 @@ namespace Media
             if (listBox1.SelectedIndex >= 0 && axWindowsMediaPlayer1 != null && axWindowsMediaPlayer1.Created)
             {
                 axWindowsMediaPlayer1.URL = paths[listBox1.SelectedIndex];
+                UpdateNowPlayingPanel();
             }
         }
 
+
+
+        private void UpdateNowPlayingPanel()
+        {
+            if (listBox1.SelectedIndex >= 0 && listBox1.SelectedItem != null)
+            {
+                string title = listBox1.SelectedItem.ToString() ?? "Wybierz utwór";
+                NowTitle.Text = System.IO.Path.GetFileNameWithoutExtension(title);
+                NowArtist.Text = "Lokalny plik";
+                InfoAlbum.Text = "Album: -";
+                InfoCategory.Text = "Kategoria: -";
+
+                if (axWindowsMediaPlayer1?.currentMedia != null && axWindowsMediaPlayer1.currentMedia.duration > 0)
+                    InfoTime.Text = "Czas: " + FormatTime(axWindowsMediaPlayer1.currentMedia.duration);
+                else
+                    InfoTime.Text = "Czas: -";
+            }
+            else
+            {
+                NowTitle.Text = "Wybierz utwór";
+                NowArtist.Text = "Artysta";
+                InfoAlbum.Text = "Album: -";
+                InfoCategory.Text = "Kategoria: -";
+                InfoTime.Text = "Czas: -";
+            }
+        }
+
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // Na razie zostawiamy wyszukiwarkę jako element wizualny.
+            // Można tu później dodać filtrowanie listy utworów.
+        }
+
+        private void Category_Click(object sender, RoutedEventArgs e)
+        {
+            // Kategorie są teraz częścią wyglądu aplikacji.
+            // Logikę filtrowania można dopisać po dodaniu danych o gatunkach.
+        }
 
         private void open(object sender, MouseButtonEventArgs e)
         {
@@ -183,12 +222,13 @@ namespace Media
                 double duration = axWindowsMediaPlayer1.currentMedia?.duration ?? 0;
 
                 // Aktualizacja labeli
-                time.Content = FormatTime(currentPosition);
-                alltime.Content = FormatTime(duration);
+                time.Text = FormatTime(currentPosition);
+                alltime.Text = FormatTime(duration);
 
                 // Ustawienie wartości paska postępu
                 ProgressBar.Maximum = duration;
                 ProgressBar.Value = currentPosition;
+                InfoTime.Text = "Czas: " + FormatTime(duration);
             }
             else if (axWindowsMediaPlayer1 != null && axWindowsMediaPlayer1.playState == WMPLib.WMPPlayState.wmppsStopped)
             {
