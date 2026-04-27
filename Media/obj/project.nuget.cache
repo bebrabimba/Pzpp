@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "+vJ9XPRbwZM=",
+  "dgSpecHash": "GosiE2tbclw=",
   "success": true,
   "projectFilePath": "C:\\xampp\\htdocs\\Pzpp\\Media\\Media.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\Bimba\\.nuget\\packages\\taglibsharp\\2.3.0\\taglibsharp.2.3.0.nupkg.sha512"
+  ],
   "logs": []
 }

@@ -3,10 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Media"
         mc:Ignorable="d"
-        Title="Muzyczka" Height="640" Width="1080"
-        MinHeight="560" MinWidth="920"
+        Title="Muzyczka" Height="640" Width="1280"
+        MinHeight="560" MinWidth="1100"
         Icon="pack://application:,,,/App.ico"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -14,8 +13,8 @@
 
     <Window.Resources>
         <SolidColorBrush x:Key="Bg" Color="#151920"/>
-        <SolidColorBrush x:Key="Panel" Color="#1B2029"/>
-        <SolidColorBrush x:Key="Panel2" Color="#202632"/>
+        <SolidColorBrush x:Key="Panel" Color="#11161D"/>
+        <SolidColorBrush x:Key="Panel2" Color="#1D2330"/>
         <SolidColorBrush x:Key="TextMain" Color="#F2F4F8"/>
         <SolidColorBrush x:Key="TextMuted" Color="#AAB2C0"/>
         <SolidColorBrush x:Key="Line" Color="#2A3140"/>
@@ -54,9 +53,59 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Margin" Value="8"/>
         </Style>
+
+        <Style x:Key="FlatRepeatButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="MinWidth" Value="14"/>
+            <Setter Property="Background" Value="#11161D"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Width="14" Background="#11161D" SnapsToDevicePixels="True">
+                            <Track x:Name="PART_Track"
+                                   IsDirectionReversed="True"
+                                   Focusable="False">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource FlatRepeatButton}" Command="ScrollBar.PageUpCommand"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb MinHeight="44" Cursor="SizeNS" Background="#2B3444" BorderBrush="#3A4658" BorderThickness="1">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        CornerRadius="7"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource FlatRepeatButton}" Command="ScrollBar.PageDownCommand"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
-    <Border CornerRadius="16" Background="{StaticResource Bg}" BorderBrush="#303848" BorderThickness="1" MouseMove="move">
+    <Border CornerRadius="16" Background="{StaticResource Bg}" BorderBrush="#303848" BorderThickness="1">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220"/>
@@ -68,20 +117,17 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Pasek boczny -->
             <Border Grid.RowSpan="2" Grid.Column="0" Background="#11161D" CornerRadius="16,0,0,16" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="24,28,18,22" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Margin="43,12,40,12" VerticalAlignment="Center">
                         <TextBlock Text="♪" FontSize="32" Foreground="White" FontWeight="Bold" Margin="0,0,12,0"/>
                         <TextBlock Text="Muzyczka" FontSize="22" Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
-
-                    <Button Style="{StaticResource NavButton}" Background="#252B36" Content="⌂   Home"/>
-                    <Button Style="{StaticResource NavButton}" Content="⌕   Search"/>
-                    <Button Style="{StaticResource NavButton}" Content="▥   Library"/>
-                    <Button Style="{StaticResource NavButton}" Content="♥   Favorites"/>
-                    <Button Style="{StaticResource NavButton}" Content="♫   Playlists"/>
-
+                    <Button Style="{StaticResource NavButton}" Background="#252B36" Content="⌂   Home" FontSize="18"/>
+                    <Button Style="{StaticResource NavButton}" Content="⌕   Search" FontSize="18"/>
+                    <Button Style="{StaticResource NavButton}" Content="▥   Library" FontSize="18"/>
+                    <Button Style="{StaticResource NavButton}" Content="♥   Favorites" FontSize="18"/>
+                    <Button Style="{StaticResource NavButton}" Content="♫   Playlists" FontSize="18"/>
                     <Border Height="1" Background="{StaticResource Line}" Margin="18,14"/>
                     <TextBlock Text="Twoje playlisty" Foreground="White" FontWeight="SemiBold" Margin="24,4,0,14"/>
                     <TextBlock Text="Chill Mix" Foreground="{StaticResource TextMuted}" Margin="24,0,0,13"/>
@@ -92,14 +138,12 @@
                 </StackPanel>
             </Border>
 
-            <!-- Góra: wyszukiwarka + okno -->
             <Grid Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2" Background="#151920" MouseMove="move">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-
-                <Border Height="38" Width="520" HorizontalAlignment="Left" Margin="24,16,0,16" Background="#202632" CornerRadius="8">
+                <Border Height="38" Width="620" HorizontalAlignment="Left" Margin="24,16,0,16" Background="#202632" CornerRadius="8">
                     <Grid>
                         <TextBlock Text="⌕" Foreground="{StaticResource TextMuted}" FontSize="22" VerticalAlignment="Center" Margin="14,0,0,0"/>
                         <TextBox x:Name="SearchBox" Text="Szukaj..." TextChanged="SearchBox_TextChanged"
@@ -107,21 +151,18 @@
                                  FontSize="14" VerticalContentAlignment="Center" Margin="48,0,12,0"/>
                     </Grid>
                 </Border>
-
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,4,12,0">
                     <Image x:Name="button_minimize" Source="/images/minimize.png" Style="{StaticResource IconImage}" MouseLeftButtonDown="button_minimize_MouseLeftButtonDown"/>
                     <Image x:Name="button_close" Source="/images/close.png" Style="{StaticResource IconImage}" MouseLeftButtonDown="button_close_MouseLeftButtonDown"/>
                 </StackPanel>
             </Grid>
 
-            <!-- Lista muzyki -->
-            <Grid Grid.Column="1" Grid.Row="1" Margin="24,18,20,20">
+            <Grid Grid.Column="1" Grid.Row="1" Margin="24,18,14,20">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-
                 <TextBlock Text="Kategorie" Foreground="White" FontSize="20" FontWeight="Bold" Margin="0,0,0,14"/>
                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,18">
                     <Button Content="Wszystkie" Background="{StaticResource Accent}" Click="Category_Click"/>
@@ -131,47 +172,54 @@
                     <Button Content="Jazz" Margin="10,0,0,0" Click="Category_Click"/>
                     <Button Content="Electronic" Margin="10,0,0,0" Click="Category_Click"/>
                 </StackPanel>
-
                 <Border Grid.Row="2" Background="#171C24" CornerRadius="12" BorderBrush="{StaticResource Line}" BorderThickness="1">
                     <Grid Margin="14">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="38"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="44"/>
                         </Grid.RowDefinitions>
-                        <Grid Grid.Row="0">
+                        <Grid Grid.Row="0" Margin="0,0,24,4">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*"/>
-                                <ColumnDefinition Width="1.4*"/>
-                                <ColumnDefinition Width="1.4*"/>
-                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="44" MinWidth="40"/>
+                                <ColumnDefinition Width="2.25*" MinWidth="190"/>
+                                <ColumnDefinition Width="1.8*" MinWidth="160"/>
+                                <ColumnDefinition Width="1.45*" MinWidth="140"/>
+                                <ColumnDefinition Width="90" MinWidth="86"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Tytuł" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="Artysta" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="Album" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="3" Text="Czas" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="Nr" Tag="Number" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0"/>
+                            <TextBlock Grid.Column="1" Text="Nazwa" Tag="Title" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,0"/>
+                            <TextBlock Grid.Column="2" Text="Album" Tag="Album" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,0"/>
+                            <TextBlock Grid.Column="3" Text="Wykonawca" Tag="Artist" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,0"/>
+                            <TextBlock Grid.Column="4" Text="Rok" Tag="Year" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,0"/>
                         </Grid>
-
                         <ListBox x:Name="listBox1" Grid.Row="1"
+                                 ItemsSource="{Binding QueueItems}"
                                  SelectionChanged="list" DragEnter="DragEnter" Drop="DragDrop" AllowDrop="True"
                                  Background="Transparent" BorderThickness="0" Foreground="White"
-                                 Cursor="Hand" FontFamily="Segoe UI" FontSize="14">
+                                 Cursor="Hand" FontFamily="Segoe UI" FontSize="14"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="10,11"/>
+                                    <Setter Property="Padding" Value="0"/>
                                     <Setter Property="Margin" Value="0,1"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="ListBoxItem">
-                                                <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                <Border x:Name="RowBorder" Background="{TemplateBinding Background}" CornerRadius="2" Padding="6,6">
                                                     <ContentPresenter/>
                                                 </Border>
                                                 <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsSelected" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="#283140"/>
-                                                    </Trigger>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="#202632"/>
+                                                        <Setter TargetName="RowBorder" Property="Background" Value="#222936"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="RowBorder" Property="Background" Value="#06b025"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -179,75 +227,117 @@
                                     </Setter>
                                 </Style>
                             </ListBox.ItemContainerStyle>
+                            <ListBox.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#202632" CornerRadius="6" Margin="0,6,24,4" Padding="10,6">
+                                                <TextBlock Text="{Binding Name}" Foreground="#F2F4F8" FontWeight="SemiBold" FontSize="13"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ListBox.GroupStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,24,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="44" MinWidth="40"/>
+                                            <ColumnDefinition Width="2.25*" MinWidth="190"/>
+                                            <ColumnDefinition Width="1.8*" MinWidth="160"/>
+                                            <ColumnDefinition Width="1.45*" MinWidth="140"/>
+                                            <ColumnDefinition Width="90" MinWidth="86"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Number}" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Album}" TextTrimming="CharacterEllipsis" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Artist}" TextTrimming="CharacterEllipsis" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding Year}" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
                         </ListBox>
+
+                        <Button x:Name="RemoveButton" Grid.Row="2" Content="Usuń"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                Margin="0,8,0,0" Padding="14,7"
+                                Background="#5A1518" Foreground="White"
+                                BorderThickness="0" Click="RemoveButton_Click"/>
                     </Grid>
                 </Border>
             </Grid>
 
-            <!-- Prawa część: odtwarzacz -->
-            <Border Grid.Column="2" Grid.Row="1" Margin="0,18,24,20" Background="#11161D" CornerRadius="12" BorderBrush="{StaticResource Line}" BorderThickness="1">
-                <Grid Margin="20">
+            <!-- Prawy odtwarzacz: bez napisu 'Teraz wybrane', przesunięty do góry -->
+            <Border Grid.Column="2" Grid.Row="1" Margin="0,8,20,20" Background="#121820" CornerRadius="14" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Grid Margin="18,16,18,16">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="190"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="236"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="82"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Teraz wybrane" Foreground="White" FontSize="20" FontWeight="Bold" Margin="0,0,0,14"/>
-
-                    <Border Grid.Row="1" Background="#202632" CornerRadius="8" BorderBrush="#333B4C" BorderThickness="1">
+                    <Border Grid.Row="0" Background="#202632" CornerRadius="8" BorderBrush="#303848" BorderThickness="1" ClipToBounds="True">
                         <Grid>
-                            <TextBlock Text="♪" Foreground="#586170" FontSize="96" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            <WindowsFormsHost Name="winFormsHost" Width="0" Height="0" Visibility="Hidden"/>
+                            <Image x:Name="AlbumArtImage" Stretch="UniformToFill" Visibility="Collapsed"/>
+                            <TextBlock x:Name="AlbumArtPlaceholder" Text="♪" FontSize="80" Foreground="#687282" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
 
-                    <TextBlock x:Name="NowTitle" Grid.Row="2" Text="Wybierz utwór" Foreground="White" FontSize="20" FontWeight="Bold" Margin="0,18,0,2" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="NowArtist" Grid.Row="3" Text="Artysta" Foreground="{StaticResource TextMuted}" FontSize="14"/>
+                    <TextBlock x:Name="NowTitle" Grid.Row="1" Text="Wybierz utwór" Foreground="White" FontSize="22" FontWeight="Bold"
+                               TextWrapping="Wrap" Margin="0,22,0,2"/>
+                    <TextBlock x:Name="NowArtist" Grid.Row="2" Text="Artysta" Foreground="{StaticResource TextMuted}" FontSize="15" Margin="0,0,0,18"/>
 
-                    <Border Grid.Row="4" Height="1" Background="{StaticResource Line}" Margin="0,18"/>
-
-                    <StackPanel Grid.Row="5">
-                        <TextBlock Text="Informacje" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,0,0,14"/>
-                        <TextBlock x:Name="InfoAlbum" Text="Album: -" Foreground="{StaticResource TextMuted}" Margin="0,0,0,9"/>
-                        <TextBlock x:Name="InfoCategory" Text="Kategoria: -" Foreground="{StaticResource TextMuted}" Margin="0,0,0,9"/>
-                        <TextBlock x:Name="InfoTime" Text="Czas: -" Foreground="{StaticResource TextMuted}"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="6" Margin="0,18,0,0">
-                        <ProgressBar x:Name="ProgressBar" Height="7" Minimum="0" Maximum="100" Value="0"
-                                     Background="#05070A" BorderBrush="{x:Null}" Cursor="Hand"
-                                     MouseLeftButtonDown="ProgressBar_MouseLeftButtonDown"/>
-                        <Grid Margin="0,6,0,8">
+                    <Grid Grid.Row="3" Margin="0,4,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <ProgressBar x:Name="ProgressBar" Height="6" Background="Black" BorderBrush="{x:Null}"
+                                     Cursor="Hand" MouseLeftButtonDown="ProgressBar_MouseLeftButtonDown"/>
+                        <Grid Grid.Row="1" Margin="0,8,0,0">
                             <TextBlock x:Name="time" Text="00:00" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
                             <TextBlock x:Name="alltime" Text="00:00" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
                         </Grid>
+                    </Grid>
 
-                        <DockPanel LastChildFill="False" HorizontalAlignment="Center" Margin="0,4,0,12">
-                            <Image x:Name="previous" Source="/images/last.png" Style="{StaticResource IconImage}" Width="42" Height="42" MouseDown="previousClick"/>
-                            <Image x:Name="stop" Source="/images/stop.png" Style="{StaticResource IconImage}" Width="42" Height="42" MouseDown="stopСlick"/>
-                            <Image x:Name="pause" Source="/images/pause.png" Style="{StaticResource IconImage}" Width="42" Height="42" MouseDown="pauseСlick"/>
-                            <Image x:Name="play" Source="/images/play.png" Style="{StaticResource IconImage}" Width="52" Height="52" MouseDown="playСlick"/>
-                            <Image x:Name="next" Source="/images/next.png" Style="{StaticResource IconImage}" Width="42" Height="42" MouseDown="nextClick"/>
-                        </DockPanel>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="48"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Image x:Name="volume" Source="/images/volume.png" Width="30" Height="30" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <Slider x:Name="trackBar" Grid.Column="1" Minimum="0" Maximum="100" Value="50" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" MouseMove="volumeBarScroll"/>
-                            <Label x:Name="value" Grid.Column="2" Content="50" Foreground="White" FontWeight="Bold" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-                            <Image x:Name="folder" Grid.Column="3" Source="/images/folder.png" Width="34" Height="34" Cursor="Hand" MouseDown="open"/>
+                    <Grid Grid.Row="4" Width="210" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="70"/>
+                        </Grid.ColumnDefinitions>
+                        <Image x:Name="previous" Grid.Column="0" Source="/images/last.png" Width="42" Height="42" Stretch="Uniform" Cursor="Hand" HorizontalAlignment="Center" MouseDown="previousClick"/>
+                        <Grid Grid.Column="1" Width="64" Height="64" HorizontalAlignment="Center">
+                            <Ellipse Fill="Black"/>
+                            <Image x:Name="play" Source="/images/play.png" Width="50" Height="50" Stretch="Uniform" Cursor="Hand" HorizontalAlignment="Center" VerticalAlignment="Center" MouseDown="playСlick"/>
+                            <Image x:Name="pause" Source="/images/pause.png" Width="50" Height="50" Stretch="Uniform" Cursor="Hand" HorizontalAlignment="Center" VerticalAlignment="Center" MouseDown="pauseСlick" Visibility="Collapsed"/>
                         </Grid>
-                    </StackPanel>
+                        <Image x:Name="next" Grid.Column="2" Source="/images/next.png" Width="42" Height="42" Stretch="Uniform" Cursor="Hand" HorizontalAlignment="Center" MouseDown="nextClick"/>
+                    </Grid>
+
+                    <!-- Pasek głośności widoczny po przesunięciu całości w górę -->
+                    <Grid Grid.Row="5" Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="44"/>
+                        </Grid.ColumnDefinitions>
+                        <Image x:Name="volume" Source="/images/volume.png" Width="24" Height="24" Stretch="Uniform" VerticalAlignment="Center"/>
+                        <Slider x:Name="trackBar" Grid.Column="1"
+                                Minimum="0" Maximum="100" Value="50" TickFrequency="1" IsSnapToTickEnabled="False"
+                                VerticalAlignment="Center"
+                                PreviewMouseLeftButtonDown="trackBar_PreviewMouseLeftButtonDown"
+                                PreviewMouseMove="trackBar_PreviewMouseMove"
+                                PreviewMouseLeftButtonUp="trackBar_PreviewMouseLeftButtonUp"
+                                ValueChanged="trackBar_ValueChanged"/>
+                        <Label x:Name="value" Grid.Column="2" Content="50" Foreground="White" FontWeight="Bold"
+                               HorizontalContentAlignment="Right" VerticalContentAlignment="Center"/>
+                    </Grid>
+
+                    <WindowsFormsHost x:Name="winFormsHost" Width="0" Height="0" Visibility="Hidden"/>
                 </Grid>
             </Border>
         </Grid>
