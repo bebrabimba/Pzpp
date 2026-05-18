@@ -3,13 +3,19 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="Muzyczka" Height="640" Width="1280"
-        MinHeight="560" MinWidth="1100"
+        Title="Muzyczka" Height="620" Width="1120"
+        MinHeight="460" MinWidth="820"
         Icon="pack://application:,,,/App.ico"
         WindowStyle="None"
+        ResizeMode="CanResize"
         AllowsTransparency="True"
         Background="Transparent">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="7" CornerRadius="16" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <SolidColorBrush x:Key="Bg" Color="#151920"/>
@@ -68,21 +74,19 @@
         </Style>
 
         <Style TargetType="ScrollBar">
-            <Setter Property="Width" Value="14"/>
-            <Setter Property="MinWidth" Value="14"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="MinWidth" Value="12"/>
             <Setter Property="Background" Value="#11161D"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollBar">
-                        <Grid Width="14" Background="#11161D" SnapsToDevicePixels="True">
-                            <Track x:Name="PART_Track"
-                                   IsDirectionReversed="True"
-                                   Focusable="False">
+                        <Grid Width="12" Background="#11161D" SnapsToDevicePixels="True">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" Focusable="False">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Style="{StaticResource FlatRepeatButton}" Command="ScrollBar.PageUpCommand"/>
                                 </Track.DecreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb MinHeight="44" Cursor="SizeNS" Background="#2B3444" BorderBrush="#3A4658" BorderThickness="1">
+                                    <Thumb MinHeight="38" Background="#2B3444" BorderBrush="#3A4658" BorderThickness="1" Cursor="SizeNS">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
                                                 <Border Background="{TemplateBinding Background}"
@@ -102,15 +106,15 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
     </Window.Resources>
 
     <Border CornerRadius="16" Background="{StaticResource Bg}" BorderBrush="#303848" BorderThickness="1">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="250" MinWidth="190"/>
+                <ColumnDefinition Width="6" MinWidth="6"/>
+                <ColumnDefinition Width="2.2*" MinWidth="320"/>
+                <ColumnDefinition Width="1*" MinWidth="240"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="70"/>
@@ -118,60 +122,127 @@
             </Grid.RowDefinitions>
 
             <Border Grid.RowSpan="2" Grid.Column="0" Background="#11161D" CornerRadius="16,0,0,16" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="43,12,40,12" VerticalAlignment="Center">
-                        <TextBlock Text="♪" FontSize="32" Foreground="White" FontWeight="Bold" Margin="0,0,12,0"/>
-                        <TextBlock Text="Muzyczka" FontSize="22" Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
+                <Grid Margin="16,16,12,16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,8,0,20" VerticalAlignment="Center">
+                        <TextBlock Text="♪" FontSize="30" Foreground="White" FontWeight="Bold" Margin="0,0,10,0"/>
+                        <TextBlock Text="Muzyczka" FontSize="21" Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <Button Style="{StaticResource NavButton}" Background="#252B36" Content="⌂   Home" FontSize="18"/>
-                    <Button Style="{StaticResource NavButton}" Content="⌕   Search" FontSize="18"/>
-                    <Button Style="{StaticResource NavButton}" Content="▥   Library" FontSize="18"/>
-                    <Button Style="{StaticResource NavButton}" Content="♥   Favorites" FontSize="18"/>
-                    <Button Style="{StaticResource NavButton}" Content="♫   Playlists" FontSize="18"/>
-                    <Border Height="1" Background="{StaticResource Line}" Margin="18,14"/>
-                    <TextBlock Text="Twoje playlisty" Foreground="White" FontWeight="SemiBold" Margin="24,4,0,14"/>
-                    <TextBlock Text="Chill Mix" Foreground="{StaticResource TextMuted}" Margin="24,0,0,13"/>
-                    <TextBlock Text="Top Hits" Foreground="{StaticResource TextMuted}" Margin="24,0,0,13"/>
-                    <TextBlock Text="Workout" Foreground="{StaticResource TextMuted}" Margin="24,0,0,13"/>
-                    <TextBlock Text="Focus" Foreground="{StaticResource TextMuted}" Margin="24,0,0,13"/>
-                    <TextBlock Text="Polski Rap" Foreground="{StaticResource TextMuted}" Margin="24,0,0,13"/>
-                </StackPanel>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <TextBlock Text="Library" Foreground="White" FontWeight="Bold" FontSize="18" VerticalAlignment="Center"/>
+                        <Button Content="↻" Width="34" Height="30" Padding="0" HorizontalAlignment="Right"
+                                Background="#252B36" ToolTip="Odśwież bibliotekę" Click="RefreshLibrary_Click"/>
+                    </Grid>
+
+                    <Button x:Name="LibraryBackButton" Grid.Row="2" Content="← Wróć" Margin="0,0,0,8" Padding="10,7"
+                            HorizontalAlignment="Stretch" Background="#202632" Visibility="Collapsed"
+                            Click="LibraryBackButton_Click"/>
+
+                    <ListBox x:Name="LibraryList" Grid.Row="3"
+                             ItemsSource="{Binding LibraryItems}"
+                             SelectionMode="Extended"
+                             SelectionChanged="LibraryList_SelectionChanged"
+                             PreviewMouseLeftButtonDown="LibraryList_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="LibraryList_PreviewMouseMove"
+                             Background="Transparent" BorderThickness="0"
+                             Foreground="White" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.CanContentScroll="False">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,2"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="LibRow" Background="{TemplateBinding Background}" CornerRadius="8" Padding="8,7">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="LibRow" Property="Background" Value="#202632"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="LibRow" Property="Background" Value="#252B36"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="{Binding IndentMargin}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Icon}" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" FontSize="14" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                                        <Run Text="{Binding DisplayPrefix}" Foreground="White"/>
+                                        <Run Text="{Binding DisplayMatch}" Foreground="#06b025"/>
+                                        <Run Text="{Binding DisplaySuffix}" Foreground="White"/>
+                                    </TextBlock>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
             </Border>
 
-            <Grid Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="2" Background="#151920" MouseMove="move">
+            <GridSplitter Grid.Column="1" Grid.RowSpan="2"
+                          Width="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                          Background="#202632" ShowsPreview="True"
+                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext"
+                          Cursor="SizeWE"/>
+
+            <Grid Grid.Column="2" Grid.Row="0" Grid.ColumnSpan="2" Background="#151920" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Border Height="38" Width="620" HorizontalAlignment="Left" Margin="24,16,0,16" Background="#202632" CornerRadius="8">
+                <Border Height="38" MaxWidth="520" HorizontalAlignment="Stretch" Margin="24,16,24,16" Background="#202632" CornerRadius="8">
                     <Grid>
                         <TextBlock Text="⌕" Foreground="{StaticResource TextMuted}" FontSize="22" VerticalAlignment="Center" Margin="14,0,0,0"/>
-                        <TextBox x:Name="SearchBox" Text="Szukaj..." TextChanged="SearchBox_TextChanged"
+                        <TextBox x:Name="SearchBox" Text="Szukaj..." TextChanged="SearchBox_TextChanged" GotFocus="SearchBox_GotFocus" LostFocus="SearchBox_LostFocus"
                                  Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextMuted}"
                                  FontSize="14" VerticalContentAlignment="Center" Margin="48,0,12,0"/>
                     </Grid>
                 </Border>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,4,12,0">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
                     <Image x:Name="button_minimize" Source="/images/minimize.png" Style="{StaticResource IconImage}" MouseLeftButtonDown="button_minimize_MouseLeftButtonDown"/>
                     <Image x:Name="button_close" Source="/images/close.png" Style="{StaticResource IconImage}" MouseLeftButtonDown="button_close_MouseLeftButtonDown"/>
                 </StackPanel>
             </Grid>
 
-            <Grid Grid.Column="1" Grid.Row="1" Margin="24,18,14,20">
+            <Grid Grid.Column="2" Grid.Row="1" Margin="18,18,16,20">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <TextBlock Text="Kategorie" Foreground="White" FontSize="20" FontWeight="Bold" Margin="0,0,0,14"/>
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,18">
+                <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,18">
                     <Button Content="Wszystkie" Background="{StaticResource Accent}" Click="Category_Click"/>
                     <Button Content="Pop" Margin="10,0,0,0" Click="Category_Click"/>
                     <Button Content="Rock" Margin="10,0,0,0" Click="Category_Click"/>
                     <Button Content="Hip-Hop" Margin="10,0,0,0" Click="Category_Click"/>
                     <Button Content="Jazz" Margin="10,0,0,0" Click="Category_Click"/>
                     <Button Content="Electronic" Margin="10,0,0,0" Click="Category_Click"/>
-                </StackPanel>
+                </WrapPanel>
                 <Border Grid.Row="2" Background="#171C24" CornerRadius="12" BorderBrush="{StaticResource Line}" BorderThickness="1">
                     <Grid Margin="14">
                         <Grid.RowDefinitions>
@@ -179,13 +250,13 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="44"/>
                         </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Margin="0,0,24,4">
+                        <Grid Grid.Row="0" Margin="0,0,18,4">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="44" MinWidth="40"/>
-                                <ColumnDefinition Width="2.25*" MinWidth="190"/>
-                                <ColumnDefinition Width="1.8*" MinWidth="160"/>
-                                <ColumnDefinition Width="1.45*" MinWidth="140"/>
-                                <ColumnDefinition Width="90" MinWidth="86"/>
+                                <ColumnDefinition Width="46" MinWidth="42"/>
+                                <ColumnDefinition Width="2.1*" MinWidth="120"/>
+                                <ColumnDefinition Width="1.7*" MinWidth="110"/>
+                                <ColumnDefinition Width="1.35*" MinWidth="100"/>
+                                <ColumnDefinition Width="66" MinWidth="60"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Nr" Tag="Number" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0"/>
                             <TextBlock Grid.Column="1" Text="Nazwa" Tag="Title" MouseLeftButtonDown="HeaderSort_Click" Cursor="Hand" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,0"/>
@@ -195,7 +266,9 @@
                         </Grid>
                         <ListBox x:Name="listBox1" Grid.Row="1"
                                  ItemsSource="{Binding QueueItems}"
-                                 SelectionChanged="list" DragEnter="DragEnter" Drop="DragDrop" AllowDrop="True"
+                                 SelectionMode="Extended"
+                                 SelectionChanged="list" KeyDown="listBox1_KeyDown"
+                                 DragEnter="DragEnter" Drop="DragDrop" AllowDrop="True"
                                  Background="Transparent" BorderThickness="0" Foreground="White"
                                  Cursor="Hand" FontFamily="Segoe UI" FontSize="14"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -229,24 +302,40 @@
                             </ListBox.ItemContainerStyle>
                             <ListBox.GroupStyle>
                                 <GroupStyle>
-                                    <GroupStyle.HeaderTemplate>
-                                        <DataTemplate>
-                                            <Border Background="#202632" CornerRadius="6" Margin="0,6,24,4" Padding="10,6">
-                                                <TextBlock Text="{Binding Name}" Foreground="#F2F4F8" FontWeight="SemiBold" FontSize="13"/>
-                                            </Border>
-                                        </DataTemplate>
-                                    </GroupStyle.HeaderTemplate>
+                                    <GroupStyle.ContainerStyle>
+                                        <Style TargetType="{x:Type GroupItem}">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                        <Expander IsExpanded="True" Foreground="#F2F4F8" Expanded="QueueGroup_Expanded">
+                                                            <Expander.Header>
+                                                                <Border Background="#202632" CornerRadius="6" Margin="0,6,18,4" Padding="10,6" MinWidth="250">
+                                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                        <TextBlock Text="📁" Foreground="#F2F4F8" FontSize="13" Margin="0,0,7,0"/>
+                                                                        <TextBlock Text="{Binding Name}" Foreground="#F2F4F8" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </Expander.Header>
+                                                            <Border Margin="0,0,0,8">
+                                                                <ItemsPresenter/>
+                                                            </Border>
+                                                        </Expander>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </GroupStyle.ContainerStyle>
                                 </GroupStyle>
                             </ListBox.GroupStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid Margin="0,0,24,0">
+                                    <Grid Margin="0,0,18,0">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="44" MinWidth="40"/>
-                                            <ColumnDefinition Width="2.25*" MinWidth="190"/>
-                                            <ColumnDefinition Width="1.8*" MinWidth="160"/>
-                                            <ColumnDefinition Width="1.45*" MinWidth="140"/>
-                                            <ColumnDefinition Width="90" MinWidth="86"/>
+                                            <ColumnDefinition Width="46" MinWidth="42"/>
+                                            <ColumnDefinition Width="2.1*" MinWidth="120"/>
+                                            <ColumnDefinition Width="1.7*" MinWidth="110"/>
+                                            <ColumnDefinition Width="1.35*" MinWidth="100"/>
+                                            <ColumnDefinition Width="66" MinWidth="60"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding Number}" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
                                         <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" Foreground="White" VerticalAlignment="Center" Margin="5,0"/>
@@ -261,21 +350,20 @@
                         <Button x:Name="RemoveButton" Grid.Row="2" Content="Usuń"
                                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                 Margin="0,8,0,0" Padding="14,7"
-                                Background="#5A1518" Foreground="White"
+                                Background="#B0181F" Foreground="White"
                                 BorderThickness="0" Click="RemoveButton_Click"/>
                     </Grid>
                 </Border>
             </Grid>
 
-            <!-- Prawy odtwarzacz: bez napisu 'Teraz wybrane', przesunięty do góry -->
-            <Border Grid.Column="2" Grid.Row="1" Margin="0,8,20,20" Background="#121820" CornerRadius="14" BorderBrush="{StaticResource Line}" BorderThickness="1">
+            <Border Grid.Column="3" Grid.Row="1" Margin="0,8,12,20" Background="#121820" CornerRadius="14" BorderBrush="{StaticResource Line}" BorderThickness="1">
                 <Grid Margin="18,16,18,16">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="236"/>
+                        <RowDefinition Height="2.2*" MinHeight="150"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="82"/>
+                        <RowDefinition Height="76"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
@@ -287,7 +375,7 @@
                     </Border>
 
                     <TextBlock x:Name="NowTitle" Grid.Row="1" Text="Wybierz utwór" Foreground="White" FontSize="22" FontWeight="Bold"
-                               TextWrapping="Wrap" Margin="0,22,0,2"/>
+                               TextWrapping="Wrap" Margin="0,14,0,2"/>
                     <TextBlock x:Name="NowArtist" Grid.Row="2" Text="Artysta" Foreground="{StaticResource TextMuted}" FontSize="15" Margin="0,0,0,18"/>
 
                     <Grid Grid.Row="3" Margin="0,4,0,0">
@@ -318,7 +406,6 @@
                         <Image x:Name="next" Grid.Column="2" Source="/images/next.png" Width="42" Height="42" Stretch="Uniform" Cursor="Hand" HorizontalAlignment="Center" MouseDown="nextClick"/>
                     </Grid>
 
-                    <!-- Pasek głośności widoczny po przesunięciu całości w górę -->
                     <Grid Grid.Row="5" Margin="0,6,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="30"/>

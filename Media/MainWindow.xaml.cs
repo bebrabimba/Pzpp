@@ -7,10 +7,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Forms.Integration;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using AxWMPLib;
 using WMPLib;
 using WinForms = System.Windows.Forms;
@@ -22,18 +24,37 @@ namespace Media
         private WinForms.Timer timer;
         private AxWindowsMediaPlayer axWindowsMediaPlayer1;
         public ObservableCollection<SongMetadata> QueueItems { get; } = new();
-        private string[] paths = Array.Empty<string>();
-        private string[] files = Array.Empty<string>();
-        private readonly Dictionary<string, SongMetadata> metadataCache = new();
+        public ObservableCollection<LibraryEntry> LibraryItems { get; } = new();
+        private string libraryRootPath = string.Empty;
+        private string currentLibraryPath = string.Empty;
+        private readonly HashSet<string> expandedLibraryFolders = new(StringComparer.OrdinalIgnoreCase);
+        private bool suppressLibrarySelectionChanged;
+        private bool suppressSearchTextChanged;
+        private DispatcherTimer librarySearchTimer;
+        private readonly Dictionary<string, SongMetadata> metadataCache = new(StringComparer.OrdinalIgnoreCase);
         private bool isDraggingVolume;
         private bool suppressSelectionChanged;
         private string sortColumn = "Number";
         private bool sortAscending = true;
+        private Point libraryDragStartPoint;
+        private const string LibraryAudioDragFormat = "Media.LibraryAudioPaths";
+
+        private static readonly string[] SupportedAudioExtensions =
+        {
+            ".mp3", ".wav", ".wma", ".aac", ".m4a", ".flac"
+        };
 
         public MainWindow()
         {
             InitializeComponent();
             DataContext = this;
+            listBox1.SelectionMode = SelectionMode.Extended;
+            LibraryList.SelectionMode = SelectionMode.Extended;
+
+            librarySearchTimer = new DispatcherTimer();
+            librarySearchTimer.Interval = TimeSpan.FromSeconds(1);
+            librarySearchTimer.Tick += LibrarySearchTimer_Tick;
+            LoadLibraryBrowser();
             ConfigureQueueView();
 
             axWindowsMediaPlayer1 = new AxWindowsMediaPlayer();
@@ -55,12 +76,403 @@ namespace Media
 
         private void button_minimize_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => WindowState = WindowState.Minimized;
 
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                return;
+            }
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            if (WindowState == WindowState.Maximized)
+            {
+                double ratio = ActualWidth > 0 ? e.GetPosition(this).X / ActualWidth : 0.5;
+                WindowState = WindowState.Normal;
+                Left = WinForms.Cursor.Position.X - (RestoreBounds.Width * ratio);
+                Top = WinForms.Cursor.Position.Y - 18;
+            }
+
+            DragMove();
+        }
+
         private void move(object sender, System.Windows.Input.MouseEventArgs e)
         {
-            // Nie przechwytuj przeciągania kontrolek wewnątrz okna (np. scrollbarów i sliderów).
-            // DragMove zostaje tylko dla górnego paska okna.
-            if (e.LeftButton == MouseButtonState.Pressed && sender is Grid)
+            if (e.LeftButton == MouseButtonState.Pressed)
                 DragMove();
+        }
+
+        private void LoadLibraryBrowser()
+        {
+            libraryRootPath = ResolveLibraryRootPath();
+            currentLibraryPath = libraryRootPath;
+            expandedLibraryFolders.Clear();
+            LoadLibraryFolder(currentLibraryPath);
+        }
+
+        private string ResolveLibraryRootPath()
+        {
+            string start = AppContext.BaseDirectory;
+            DirectoryInfo? dir = new DirectoryInfo(start);
+
+            while (dir != null)
+            {
+                string candidate = Path.Combine(dir.FullName, "Library");
+                if (Directory.Exists(candidate))
+                    return candidate;
+
+                if (File.Exists(Path.Combine(dir.FullName, "Media.csproj")))
+                    return candidate;
+
+                dir = dir.Parent;
+            }
+
+            return @"C:\xampp\htdocs\Pzpp\Media\Library";
+        }
+
+        private void LoadLibraryFolder(string folderPath)
+        {
+            suppressLibrarySelectionChanged = true;
+            LibraryItems.Clear();
+
+            if (!Directory.Exists(folderPath))
+            {
+                LibraryItems.Add(new LibraryEntry
+                {
+                    DisplayName = "Nie znaleziono folderu Library",
+                    FullPath = folderPath,
+                    IsFolder = false,
+                    Icon = "⚠",
+                    Level = 0
+                });
+                foreach (var item in LibraryItems)
+                    item.SetSearchHighlight(string.Empty);
+
+                LibraryBackButton.Visibility = Visibility.Collapsed;
+                suppressLibrarySelectionChanged = false;
+                return;
+            }
+
+            currentLibraryPath = folderPath;
+            LibraryBackButton.Visibility = Visibility.Collapsed;
+
+            string query = GetLibrarySearchQuery();
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                // Normalny widok: foldery są zawsze widoczne, a zawartość pojawia się pod rozwiniętym folderem.
+                AddLibraryDirectoryEntries(folderPath, 0, includeCurrentFolderRow: false);
+            }
+            else
+            {
+                // Widok wyszukiwania: pokazujemy tylko pasujące foldery/pliki oraz ich ścieżkę nadrzędną.
+                // Foldery z wynikami są automatycznie otwarte, a reszta biblioteki jest ukryta.
+                AddLibrarySearchEntries(folderPath, 0, includeCurrentFolderRow: false, query);
+            }
+
+            foreach (var item in LibraryItems)
+                item.SetSearchHighlight(query);
+
+            suppressLibrarySelectionChanged = false;
+        }
+
+        private string GetLibrarySearchQuery()
+        {
+            if (SearchBox == null) return string.Empty;
+            string text = SearchBox.Text?.Trim() ?? string.Empty;
+            return string.Equals(text, "Szukaj...", StringComparison.OrdinalIgnoreCase) ? string.Empty : text;
+        }
+
+        private bool IsLibrarySearchActive() => !string.IsNullOrWhiteSpace(GetLibrarySearchQuery());
+
+        private bool TextMatchesSearch(string? value, string query)
+        {
+            return !string.IsNullOrWhiteSpace(value) &&
+                   value.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
+        }
+
+        private void AddLibraryDirectoryEntries(string folderPath, int level, bool includeCurrentFolderRow)
+        {
+            if (includeCurrentFolderRow)
+            {
+                bool isExpanded = expandedLibraryFolders.Contains(folderPath);
+                LibraryItems.Add(new LibraryEntry
+                {
+                    DisplayName = Path.GetFileName(folderPath),
+                    FullPath = folderPath,
+                    IsFolder = true,
+                    IsExpanded = isExpanded,
+                    Icon = isExpanded ? "📂" : "📁",
+                    Level = level,
+                    IsSearchMatch = false
+                });
+
+                if (!isExpanded)
+                    return;
+
+                level++;
+            }
+
+            foreach (string dir in Directory.EnumerateDirectories(folderPath).OrderBy(Path.GetFileName))
+                AddLibraryDirectoryEntries(dir, level, includeCurrentFolderRow: true);
+
+            foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
+                AddLibraryFileEntry(file, level);
+        }
+
+        private bool AddLibrarySearchEntries(string folderPath, int level, bool includeCurrentFolderRow, string query)
+        {
+            var buffer = new List<LibraryEntry>();
+            bool found = AddLibrarySearchEntriesToBuffer(folderPath, level, query, buffer, includeRoot: includeCurrentFolderRow);
+            if (!includeCurrentFolderRow)
+            {
+                foreach (var item in buffer)
+                    LibraryItems.Add(item);
+            }
+            return found;
+        }
+
+        private bool AddLibrarySearchEntriesToBuffer(string folderPath, int level, string query, List<LibraryEntry> buffer, bool includeRoot = true)
+        {
+            bool folderNameMatches = TextMatchesSearch(Path.GetFileName(folderPath), query);
+            var children = new List<LibraryEntry>();
+
+            if (folderNameMatches)
+            {
+                AddFullDirectoryTreeToBuffer(folderPath, level + (includeRoot ? 1 : 0), children);
+            }
+            else
+            {
+                foreach (string dir in Directory.EnumerateDirectories(folderPath).OrderBy(Path.GetFileName))
+                    AddLibrarySearchEntriesToBuffer(dir, level + (includeRoot ? 1 : 0), query, children, includeRoot: true);
+
+                foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
+                {
+                    if (TextMatchesSearch(Path.GetFileName(file), query))
+                        children.Add(CreateLibraryFileEntry(file, level + (includeRoot ? 1 : 0), query));
+                }
+            }
+
+            if (children.Count == 0 && !folderNameMatches)
+                return false;
+
+            if (includeRoot)
+            {
+                buffer.Add(new LibraryEntry
+                {
+                    DisplayName = Path.GetFileName(folderPath),
+                    FullPath = folderPath,
+                    IsFolder = true,
+                    IsExpanded = true,
+                    Icon = "📂",
+                    Level = level,
+                    IsSearchMatch = folderNameMatches
+                });
+            }
+
+            buffer.AddRange(children);
+            return true;
+        }
+
+        private void AddFullDirectoryTreeToBuffer(string folderPath, int level, List<LibraryEntry> buffer)
+        {
+            foreach (string dir in Directory.EnumerateDirectories(folderPath).OrderBy(Path.GetFileName))
+            {
+                buffer.Add(new LibraryEntry
+                {
+                    DisplayName = Path.GetFileName(dir),
+                    FullPath = dir,
+                    IsFolder = true,
+                    IsExpanded = true,
+                    Icon = "📂",
+                    Level = level
+                });
+                AddFullDirectoryTreeToBuffer(dir, level + 1, buffer);
+            }
+
+            foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
+                buffer.Add(CreateLibraryFileEntry(file, level));
+        }
+
+        private void AddLibraryFileEntry(string file, int level) => LibraryItems.Add(CreateLibraryFileEntry(file, level));
+
+        private LibraryEntry CreateLibraryFileEntry(string file, int level, string? searchQuery = null)
+        {
+            return new LibraryEntry
+            {
+                DisplayName = Path.GetFileName(file),
+                FullPath = file,
+                IsFolder = false,
+                Icon = "♪",
+                Level = level,
+                IsSearchMatch = !string.IsNullOrWhiteSpace(searchQuery) && TextMatchesSearch(Path.GetFileName(file), searchQuery)
+            };
+        }
+
+        private void RefreshLibrary_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(currentLibraryPath))
+                LoadLibraryBrowser();
+            else
+                LoadLibraryFolder(currentLibraryPath);
+        }
+
+        private void LibraryBackButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Przycisk zostawiony tylko po to, żeby XAML dalej się kompilował.
+            LoadLibraryBrowser();
+        }
+
+        private void LibraryList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Nie przechwytuj myszy, gdy użytkownik klika/ciągnie pasek przewijania.
+            // Dzięki temu scrollbar w Library działa 1:1 tak jak w kolejce.
+            if (IsFromScrollBar(e.OriginalSource))
+                return;
+
+            libraryDragStartPoint = e.GetPosition(LibraryList);
+
+            var itemContainer = FindAncestor<ListBoxItem>((DependencyObject)e.OriginalSource);
+            if (itemContainer?.DataContext is not LibraryEntry entry)
+                return;
+
+            // Foldery można teraz zaznaczać tak samo jak utwory: zwykły klik, Ctrl+klik i Shift+klik.
+            // Rozwijanie / zwijanie folderu odbywa się przez podwójne kliknięcie.
+            if (entry.IsFolder && e.ClickCount == 2)
+            {
+                ToggleLibraryFolder(entry.FullPath);
+                e.Handled = true;
+                return;
+            }
+
+            // Gdy kilka elementów jest już zaznaczonych, kliknięcie jednego z nich w celu przeciągnięcia
+            // nie może kasować całego zaznaczenia. Dotyczy to zarówno utworów, jak i folderów.
+            // Ctrl/Shift zostawiamy systemowi, żeby działało jak w Windows.
+            if (itemContainer.IsSelected && Keyboard.Modifiers == ModifierKeys.None)
+                e.Handled = true;
+        }
+
+        private void LibraryList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            // Jeżeli ruch pochodzi z paska przewijania, nie uruchamiaj Drag&Drop.
+            if (IsFromScrollBar(e.OriginalSource))
+                return;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            Point currentPoint = e.GetPosition(LibraryList);
+            if (Math.Abs(currentPoint.X - libraryDragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(currentPoint.Y - libraryDragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            var selectedPaths = LibraryList.SelectedItems
+                .OfType<LibraryEntry>()
+                .Where(x =>
+                    (!x.IsFolder && File.Exists(x.FullPath) && IsSupportedAudioFile(x.FullPath)) ||
+                    (x.IsFolder && Directory.Exists(x.FullPath)))
+                .Select(x => x.FullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (selectedPaths.Length == 0)
+                return;
+
+            var data = new DataObject();
+            data.SetData(LibraryAudioDragFormat, selectedPaths);
+            System.Windows.DragDrop.DoDragDrop(LibraryList, data, System.Windows.DragDropEffects.Copy);
+        }
+
+        private void LibraryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Zaznaczanie w Library działa jak w Windows: zwykły klik, Ctrl+klik oraz Shift+klik.
+            // Do kolejki nic nie trafia automatycznie — dodawanie odbywa się tylko przez przeciągnięcie zaznaczonych utworów.
+            if (suppressLibrarySelectionChanged) return;
+        }
+
+        private void ToggleLibraryFolder(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return;
+
+            // Podczas wyszukiwania foldery są automatycznie rozwinięte, więc podwójny klik nie powinien ich ukrywać.
+            if (IsLibrarySearchActive())
+                return;
+
+            var selectedPaths = LibraryList.SelectedItems
+                .OfType<LibraryEntry>()
+                .Select(x => x.FullPath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (expandedLibraryFolders.Contains(folderPath))
+                expandedLibraryFolders.Remove(folderPath);
+            else
+                expandedLibraryFolders.Add(folderPath);
+
+            LoadLibraryFolder(currentLibraryPath);
+
+            // Po przeładowaniu listy zachowujemy zaznaczenia folderów i plików, które dalej są widoczne.
+            if (selectedPaths.Count > 0)
+                SelectLibraryEntriesByPaths(selectedPaths);
+        }
+
+        private void SelectLibraryFilesByPaths(IEnumerable<string> filePaths) => SelectLibraryEntriesByPaths(filePaths);
+
+        private void SelectLibraryEntriesByPaths(IEnumerable<string> paths)
+        {
+            var set = paths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (set.Count == 0) return;
+
+            suppressLibrarySelectionChanged = true;
+            LibraryList.SelectedItems.Clear();
+
+            foreach (var item in LibraryList.Items)
+            {
+                if (item is LibraryEntry entry && set.Contains(entry.FullPath))
+                    LibraryList.SelectedItems.Add(entry);
+            }
+
+            suppressLibrarySelectionChanged = false;
+        }
+
+        private static bool IsFromScrollBar(object originalSource)
+        {
+            if (originalSource is not DependencyObject dependencyObject)
+                return false;
+
+            return FindAncestor<ScrollBar>(dependencyObject) != null ||
+                   FindAncestor<Thumb>(dependencyObject) != null;
+        }
+
+        private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+
+                current = GetSafeParent(current);
+            }
+
+            return null;
+        }
+
+        private static DependencyObject? GetSafeParent(DependencyObject current)
+        {
+            // e.OriginalSource może być np. Run z TextBlocka. Run nie jest Visual ani Visual3D,
+            // więc VisualTreeHelper.GetParent(current) rzuca InvalidOperationException.
+            // Dlatego najpierw obsługujemy elementy tekstowe, a VisualTreeHelper wywołujemy
+            // tylko dla prawdziwych elementów drzewa wizualnego.
+            if (current is FrameworkContentElement frameworkContentElement)
+                return frameworkContentElement.Parent;
+
+            if (current is FrameworkElement frameworkElement && frameworkElement.Parent != null)
+                return frameworkElement.Parent;
+
+            if (current is System.Windows.Media.Visual || current is System.Windows.Media.Media3D.Visual3D)
+                return System.Windows.Media.VisualTreeHelper.GetParent(current);
+
+            return null;
         }
 
         private void open(object sender, MouseButtonEventArgs e)
@@ -75,24 +487,32 @@ namespace Media
 
         private void DragEnter(object sender, System.Windows.DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
-                e.Effects = System.Windows.DragDropEffects.Copy;
+            e.Effects = e.Data.GetDataPresent(LibraryAudioDragFormat)
+                ? System.Windows.DragDropEffects.Copy
+                : System.Windows.DragDropEffects.None;
+
+            e.Handled = true;
         }
 
         private void DragDrop(object sender, System.Windows.DragEventArgs e)
         {
-            string[] droppedFiles = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
+            if (!e.Data.GetDataPresent(LibraryAudioDragFormat))
+                return;
+
+            string[] droppedFiles = (string[])e.Data.GetData(LibraryAudioDragFormat);
             if (droppedFiles != null && droppedFiles.Length > 0)
                 AddFiles(droppedFiles);
+
+            e.Handled = true;
         }
 
         private async void AddFiles(string[] newPaths)
         {
-            // Nie dodawaj ponownie tych samych plików.
+            var candidatePaths = ExpandAudioPaths(newPaths);
             var existingPaths = new HashSet<string>(QueueItems.Select(x => Path.GetFullPath(x.FilePath)), StringComparer.OrdinalIgnoreCase);
             var uniquePaths = new List<string>();
 
-            foreach (string path in newPaths.Where(File.Exists))
+            foreach (string path in candidatePaths)
             {
                 string fullPath = Path.GetFullPath(path);
                 if (existingPaths.Add(fullPath))
@@ -102,30 +522,68 @@ namespace Media
             if (uniquePaths.Count == 0)
                 return;
 
+            bool shouldAutoPlay = listBox1.SelectedItem == null && string.IsNullOrWhiteSpace(axWindowsMediaPlayer1.URL);
+            string firstPath = uniquePaths[0];
+
             foreach (string file in uniquePaths)
                 QueueItems.Add(CreateFallbackSong(file));
 
-            SyncArraysFromQueue();
-
-            // Najpierw metadane pierwszego nowego pliku, potem wybór/odtworzenie.
-            if (listBox1.SelectedItem == null)
-            {
-                string firstPath = uniquePaths[0];
+            if (shouldAutoPlay)
                 await LoadMetadataAsync(firstPath);
-                SelectSongByPath(firstPath);
-            }
 
             ApplyCurrentSortPreservingSelection();
 
+            var addedFolders = uniquePaths
+                .Select(x => Path.GetDirectoryName(x) ?? string.Empty)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var pathsFromAddedFolders = QueueItems
+                .Where(x => addedFolders.Contains(x.FolderPath))
+                .Select(x => x.FilePath)
+                .ToList();
+
+            SelectSongsByPaths(pathsFromAddedFolders, firstPath);
+
+            if (shouldAutoPlay)
+                PlaySelectedSong();
+
             foreach (string file in uniquePaths)
                 _ = LoadMetadataAsync(file);
+        }
+
+        private List<string> ExpandAudioPaths(IEnumerable<string> inputPaths)
+        {
+            var result = new List<string>();
+
+            foreach (string path in inputPaths)
+            {
+                if (File.Exists(path) && IsSupportedAudioFile(path))
+                {
+                    result.Add(path);
+                }
+                else if (Directory.Exists(path))
+                {
+                    // Po przeciągnięciu folderu dodajemy wszystkie obsługiwane pliki audio z tego folderu
+                    // oraz z jego podfolderów. W kolejce dalej będą pogrupowane według faktycznego folderu pliku.
+                    result.AddRange(Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories)
+                        .Where(IsSupportedAudioFile));
+                }
+            }
+
+            return result;
+        }
+
+        private bool IsSupportedAudioFile(string path)
+        {
+            string extension = Path.GetExtension(path);
+            return SupportedAudioExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
         }
 
         private void list(object sender, SelectionChangedEventArgs e)
         {
             if (suppressSelectionChanged) return;
 
-            if (listBox1.SelectedIndex >= 0)
+            if (listBox1.SelectedItem is SongMetadata)
                 PlaySelectedSong();
         }
 
@@ -161,12 +619,8 @@ namespace Media
             {
                 int index = QueueItems.ToList().FindIndex(x => string.Equals(x.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
                 if (index >= 0)
-                {
-                    metadata.FilePath = filePath;
                     QueueItems[index] = metadata;
-                }
 
-                SyncArraysFromQueue();
                 ApplyCurrentSortPreservingSelection();
 
                 if (refreshPlayer && listBox1.SelectedItem is SongMetadata selected &&
@@ -306,7 +760,7 @@ namespace Media
 
         private void playСlick(object sender, MouseButtonEventArgs e)
         {
-            if (axWindowsMediaPlayer1.currentMedia == null && listBox1.SelectedIndex >= 0)
+            if (axWindowsMediaPlayer1.currentMedia == null && listBox1.SelectedItem != null)
                 PlaySelectedSong();
             else
                 axWindowsMediaPlayer1.Ctlcontrols.play();
@@ -429,18 +883,58 @@ namespace Media
             axWindowsMediaPlayer1.settings.volume = volume;
         }
 
+        private void QueueGroup_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Expander expander || expander.DataContext is not CollectionViewGroup group)
+                return;
+
+            string folderDisplay = group.Name?.ToString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(folderDisplay))
+                return;
+
+            var folderSongs = QueueItems
+                .Where(x => string.Equals(x.FolderDisplay, folderDisplay, StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.FilePath)
+                .ToList();
+
+            if (folderSongs.Count > 0)
+                SelectSongsByPaths(folderSongs, folderSongs[0]);
+        }
 
         private void RemoveButton_Click(object sender, RoutedEventArgs e)
         {
-            if (listBox1.SelectedItem is not SongMetadata selected) return;
+            RemoveSelectedSongs();
+        }
+
+        private void listBox1_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete)
+            {
+                RemoveSelectedSongs();
+                e.Handled = true;
+            }
+        }
+
+        private void RemoveSelectedSongs()
+        {
+            var selectedSongs = listBox1.SelectedItems.Cast<SongMetadata>().ToList();
+            if (selectedSongs.Count == 0 && listBox1.SelectedItem is SongMetadata selected)
+                selectedSongs.Add(selected);
+
+            if (selectedSongs.Count == 0)
+                return;
 
             int selectedViewIndex = listBox1.SelectedIndex;
-            bool removingCurrent = axWindowsMediaPlayer1.currentMedia != null &&
-                                   string.Equals(axWindowsMediaPlayer1.URL, selected.FilePath, StringComparison.OrdinalIgnoreCase);
+            string currentPath = axWindowsMediaPlayer1.URL ?? string.Empty;
+            bool removingCurrent = selectedSongs.Any(x => string.Equals(x.FilePath, currentPath, StringComparison.OrdinalIgnoreCase));
 
-            QueueItems.Remove(selected);
-            metadataCache.Remove(selected.FilePath);
-            SyncArraysFromQueue();
+            suppressSelectionChanged = true;
+            foreach (SongMetadata song in selectedSongs)
+            {
+                QueueItems.Remove(song);
+                metadataCache.Remove(song.FilePath);
+            }
+            suppressSelectionChanged = false;
 
             if (QueueItems.Count == 0)
             {
@@ -458,7 +952,10 @@ namespace Media
                 return;
             }
 
-            listBox1.SelectedIndex = Math.Min(selectedViewIndex, listBox1.Items.Count - 1);
+            int nextIndex = Math.Max(0, Math.Min(selectedViewIndex, listBox1.Items.Count - 1));
+            listBox1.SelectedIndex = nextIndex;
+            listBox1.ScrollIntoView(listBox1.SelectedItem);
+
             if (removingCurrent)
                 PlaySelectedSong();
         }
@@ -480,7 +977,10 @@ namespace Media
 
         private void ApplyCurrentSortPreservingSelection()
         {
-            string? selectedPath = (listBox1.SelectedItem as SongMetadata)?.FilePath;
+            var selectedPaths = listBox1.SelectedItems.Cast<SongMetadata>()
+                .Select(x => x.FilePath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string? currentSelectedPath = (listBox1.SelectedItem as SongMetadata)?.FilePath;
 
             var view = CollectionViewSource.GetDefaultView(QueueItems);
             if (view == null) return;
@@ -492,11 +992,10 @@ namespace Media
             view.SortDescriptions.Add(new SortDescription(nameof(SongMetadata.FolderDisplay), ListSortDirection.Ascending));
             view.SortDescriptions.Add(new SortDescription(SortPropertyName(sortColumn), sortAscending ? ListSortDirection.Ascending : ListSortDirection.Descending));
             view.Refresh();
-            SyncArraysFromQueue();
-
-            if (!string.IsNullOrWhiteSpace(selectedPath))
-                SelectSongByPath(selectedPath);
             suppressSelectionChanged = false;
+
+            if (selectedPaths.Count > 0)
+                SelectSongsByPaths(selectedPaths, currentSelectedPath);
         }
 
         private void ConfigureQueueView()
@@ -513,54 +1012,46 @@ namespace Media
             {
                 "Number" => nameof(SongMetadata.NumberValue),
                 "Year" => nameof(SongMetadata.YearValue),
-                "Duration" => nameof(SongMetadata.Duration),
                 "Album" => nameof(SongMetadata.Album),
                 "Artist" => nameof(SongMetadata.Artist),
                 _ => nameof(SongMetadata.Title),
             };
         }
 
-        private void SyncArraysFromQueue()
+        private void SelectSongsByPaths(IEnumerable<string> filePaths, string? primaryPath = null)
         {
-            paths = QueueItems.Select(x => x.FilePath).ToArray();
-            files = QueueItems.Select(x => Path.GetFileName(x.FilePath)).ToArray();
-        }
+            var set = filePaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (set.Count == 0) return;
 
-        private void SelectSongByPath(string filePath)
-        {
+            suppressSelectionChanged = true;
+            listBox1.SelectedItems.Clear();
+
+            SongMetadata? primary = null;
+            var songsToSelect = new List<SongMetadata>();
+
             foreach (var item in listBox1.Items)
             {
-                if (item is SongMetadata song && string.Equals(song.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                if (item is SongMetadata song && set.Contains(song.FilePath))
                 {
-                    listBox1.SelectedItem = song;
-                    listBox1.ScrollIntoView(song);
-                    break;
+                    songsToSelect.Add(song);
+                    if (primary == null || string.Equals(song.FilePath, primaryPath, StringComparison.OrdinalIgnoreCase))
+                        primary = song;
                 }
             }
-        }
 
-        private int CompareSongs(SongMetadata a, SongMetadata b, string column)
-        {
-            return column switch
+            if (primary != null)
+                listBox1.SelectedItem = primary;
+
+            foreach (SongMetadata song in songsToSelect)
             {
-                "Number" => CompareNullableNumbers(a.Number, b.Number),
-                "Year" => CompareNullableNumbers(a.Year, b.Year),
-                "Duration" => a.Duration.CompareTo(b.Duration),
-                "Album" => string.Compare(a.Album, b.Album, StringComparison.CurrentCultureIgnoreCase),
-                "Artist" => string.Compare(a.Artist, b.Artist, StringComparison.CurrentCultureIgnoreCase),
-                _ => string.Compare(a.Title, b.Title, StringComparison.CurrentCultureIgnoreCase),
-            };
-        }
+                if (!listBox1.SelectedItems.Contains(song))
+                    listBox1.SelectedItems.Add(song);
+            }
 
-        private int CompareNullableNumbers(string left, string right)
-        {
-            bool leftOk = int.TryParse(left, out int leftNumber);
-            bool rightOk = int.TryParse(right, out int rightNumber);
+            if (primary != null)
+                listBox1.ScrollIntoView(primary);
 
-            if (leftOk && rightOk) return leftNumber.CompareTo(rightNumber);
-            if (leftOk) return -1;
-            if (rightOk) return 1;
-            return string.Compare(left, right, StringComparison.CurrentCultureIgnoreCase);
+            suppressSelectionChanged = false;
         }
 
         private string GetFolderDisplay(string filePath)
@@ -570,9 +1061,93 @@ namespace Media
             return string.IsNullOrWhiteSpace(folderName) ? folder : folderName;
         }
 
-        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) { }
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (suppressSearchTextChanged || string.IsNullOrWhiteSpace(currentLibraryPath)) return;
+
+            // Debounce: nie przebudowuj całej biblioteki po każdym znaku od razu,
+            // tylko poczekaj 1 sekundę od ostatniego znaku, aż użytkownik przestanie pisać.
+            librarySearchTimer.Stop();
+            librarySearchTimer.Start();
+        }
+
+        private void LibrarySearchTimer_Tick(object? sender, EventArgs e)
+        {
+            librarySearchTimer.Stop();
+            ApplyLibrarySearch();
+        }
+
+        private void ApplyLibrarySearch()
+        {
+            if (string.IsNullOrWhiteSpace(currentLibraryPath)) return;
+
+            var selectedPaths = LibraryList?.SelectedItems
+                .OfType<LibraryEntry>()
+                .Select(x => x.FullPath)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            LoadLibraryFolder(currentLibraryPath);
+
+            if (selectedPaths.Count > 0)
+                SelectLibraryEntriesByPaths(selectedPaths);
+        }
+
+        private void SearchBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (SearchBox.Text == "Szukaj...")
+            {
+                suppressSearchTextChanged = true;
+                SearchBox.Text = string.Empty;
+                suppressSearchTextChanged = false;
+            }
+        }
+
+        private void SearchBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(SearchBox.Text))
+            {
+                suppressSearchTextChanged = true;
+                SearchBox.Text = "Szukaj...";
+                suppressSearchTextChanged = false;
+                librarySearchTimer.Stop();
+                LoadLibraryFolder(currentLibraryPath);
+            }
+        }
 
         private void Category_Click(object sender, RoutedEventArgs e) { }
+
+        public class LibraryEntry
+        {
+            public string DisplayName { get; set; } = string.Empty;
+            public string FullPath { get; set; } = string.Empty;
+            public bool IsFolder { get; set; }
+            public bool IsExpanded { get; set; }
+            public string Icon { get; set; } = string.Empty;
+            public int Level { get; set; }
+            public bool IsSearchMatch { get; set; }
+            public string DisplayPrefix { get; set; } = string.Empty;
+            public string DisplayMatch { get; set; } = string.Empty;
+            public string DisplaySuffix { get; set; } = string.Empty;
+            public Thickness IndentMargin => new Thickness(Level * 16, 0, 0, 0);
+
+            public void SetSearchHighlight(string? query)
+            {
+                DisplayPrefix = DisplayName;
+                DisplayMatch = string.Empty;
+                DisplaySuffix = string.Empty;
+
+                if (string.IsNullOrWhiteSpace(query))
+                    return;
+
+                int index = DisplayName.IndexOf(query.Trim(), StringComparison.CurrentCultureIgnoreCase);
+                if (index < 0)
+                    return;
+
+                DisplayPrefix = DisplayName[..index];
+                DisplayMatch = DisplayName.Substring(index, query.Trim().Length);
+                DisplaySuffix = DisplayName[(index + query.Trim().Length)..];
+            }
+        }
 
         public class SongMetadata
         {

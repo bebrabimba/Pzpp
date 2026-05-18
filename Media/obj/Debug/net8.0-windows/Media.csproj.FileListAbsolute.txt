@@ -39,6 +39,7 @@ C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Media.deps.json
 C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Media.runtimeconfig.json
 C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Media.dll
 C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Media.pdb
+C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\TagLibSharp.dll
 C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\AxInterop.WMPLib.dll
 C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Interop.WMPLib.dll
 C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Microsoft.DirectX.AudioVideoPlayback.dll
@@ -51,10 +52,10 @@ C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.csproj.AssemblyReferen
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Interop.MediaPlayer.dll
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Interop.WMPLauncher.dll
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.csproj.ResolveComReference.cache
+C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\MainWindow.baml
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\MainWindow.g.cs
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\App.g.cs
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media_MarkupCompile.cache
-C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\MainWindow.baml
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.g.resources
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.Properties.Resources.resources
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.csproj.GenerateResource.cache
@@ -69,4 +70,3 @@ C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\refint\Media.dll
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.pdb
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\Media.genruntimeconfig.cache
 C:\xampp\htdocs\Pzpp\Media\obj\Debug\net8.0-windows\ref\Media.dll
-C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\TagLibSharp.dll
