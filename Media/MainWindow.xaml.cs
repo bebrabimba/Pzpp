@@ -4,12 +4,14 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Forms.Integration;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -25,6 +27,14 @@ namespace Media
         private AxWindowsMediaPlayer axWindowsMediaPlayer1;
         public ObservableCollection<SongMetadata> QueueItems { get; } = new();
         public ObservableCollection<LibraryEntry> LibraryItems { get; } = new();
+        public ObservableCollection<CategoryEntry> CategoryItems { get; } = new();
+        private string selectedCategory = "Wszystkie";
+        private readonly HashSet<string> selectedCategories = new(StringComparer.CurrentCultureIgnoreCase) { "Wszystkie" };
+        private int lastSelectedCategoryIndex = 0;
+        private bool categoriesExpanded = true;
+        private readonly Dictionary<string, string[]> libraryGenreCache = new(StringComparer.OrdinalIgnoreCase);
+        private bool libraryGenresLoaded;
+        private bool isLoadingLibraryGenres;
         private string libraryRootPath = string.Empty;
         private string currentLibraryPath = string.Empty;
         private readonly HashSet<string> expandedLibraryFolders = new(StringComparer.OrdinalIgnoreCase);
@@ -47,14 +57,17 @@ namespace Media
         public MainWindow()
         {
             InitializeComponent();
+            SourceInitialized += MainWindow_SourceInitialized;
             DataContext = this;
             listBox1.SelectionMode = SelectionMode.Extended;
             LibraryList.SelectionMode = SelectionMode.Extended;
 
             librarySearchTimer = new DispatcherTimer();
-            librarySearchTimer.Interval = TimeSpan.FromSeconds(1);
+            librarySearchTimer.Interval = TimeSpan.FromMilliseconds(500);
             librarySearchTimer.Tick += LibrarySearchTimer_Tick;
+            CategoryItems.Add(new CategoryEntry { DisplayName = "Wszystkie", IsSelected = true });
             LoadLibraryBrowser();
+            _ = LoadLibraryGenresAsync();
             ConfigureQueueView();
 
             axWindowsMediaPlayer1 = new AxWindowsMediaPlayer();
@@ -75,6 +88,91 @@ namespace Media
         private void button_close_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => Close();
 
         private void button_minimize_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => WindowState = WindowState.Minimized;
+
+        private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+        {
+            IntPtr handle = new WindowInteropHelper(this).Handle;
+            HwndSource? source = HwndSource.FromHwnd(handle);
+            source?.AddHook(WindowProc);
+        }
+
+        private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_GETMINMAXINFO = 0x0024;
+
+            if (msg == WM_GETMINMAXINFO)
+                FixMaximizedSize(hwnd, lParam);
+
+            return IntPtr.Zero;
+        }
+
+        private static void FixMaximizedSize(IntPtr hwnd, IntPtr lParam)
+        {
+            const int MONITOR_DEFAULTTONEAREST = 0x00000002;
+
+            MINMAXINFO mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+
+            if (monitor != IntPtr.Zero)
+            {
+                MONITORINFO monitorInfo = new MONITORINFO();
+                monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+
+                if (GetMonitorInfo(monitor, ref monitorInfo))
+                {
+                    RECT workArea = monitorInfo.rcWork;
+                    RECT monitorArea = monitorInfo.rcMonitor;
+
+                    mmi.ptMaxPosition.x = Math.Abs(workArea.left - monitorArea.left);
+                    mmi.ptMaxPosition.y = Math.Abs(workArea.top - monitorArea.top);
+                    mmi.ptMaxSize.x = Math.Abs(workArea.right - workArea.left);
+                    mmi.ptMaxSize.y = Math.Abs(workArea.bottom - workArea.top);
+                }
+            }
+
+            Marshal.StructureToPtr(mmi, lParam, true);
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, int dwFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MINMAXINFO
+        {
+            public POINT ptReserved;
+            public POINT ptMaxSize;
+            public POINT ptMaxPosition;
+            public POINT ptMinTrackSize;
+            public POINT ptMaxTrackSize;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public int dwFlags;
+        }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -186,17 +284,46 @@ namespace Media
 
         private bool IsLibrarySearchActive() => !string.IsNullOrWhiteSpace(GetLibrarySearchQuery());
 
+        private bool IsCategoryFilterActive() => selectedCategories.Count > 0 &&
+                                               !selectedCategories.Contains("Wszystkie");
+
+        private bool FileMatchesCategory(string filePath)
+        {
+            if (!IsCategoryFilterActive())
+                return true;
+
+            return libraryGenreCache.TryGetValue(filePath, out string[] genres) &&
+                   genres.Any(g => selectedCategories.Contains(g));
+        }
+
         private bool TextMatchesSearch(string? value, string query)
         {
             return !string.IsNullOrWhiteSpace(value) &&
                    value.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
         }
 
-        private void AddLibraryDirectoryEntries(string folderPath, int level, bool includeCurrentFolderRow)
+        private bool AddLibraryDirectoryEntries(string folderPath, int level, bool includeCurrentFolderRow)
         {
+            var children = new List<LibraryEntry>();
+
+            foreach (string dir in Directory.EnumerateDirectories(folderPath).OrderBy(Path.GetFileName))
+            {
+                AddLibraryDirectoryEntriesToBuffer(dir, level + (includeCurrentFolderRow ? 1 : 0), children, includeCurrentFolderRow: true);
+            }
+
+            foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
+            {
+                if (FileMatchesCategory(file))
+                    children.Add(CreateLibraryFileEntry(file, level + (includeCurrentFolderRow ? 1 : 0)));
+            }
+
             if (includeCurrentFolderRow)
             {
                 bool isExpanded = expandedLibraryFolders.Contains(folderPath);
+                bool shouldShowFolder = !IsCategoryFilterActive() || children.Count > 0;
+                if (!shouldShowFolder)
+                    return false;
+
                 LibraryItems.Add(new LibraryEntry
                 {
                     DisplayName = Path.GetFileName(folderPath),
@@ -208,17 +335,54 @@ namespace Media
                     IsSearchMatch = false
                 });
 
-                if (!isExpanded)
-                    return;
+                if (isExpanded)
+                {
+                    foreach (var child in children)
+                        LibraryItems.Add(child);
+                }
 
-                level++;
+                return true;
             }
 
+            foreach (var child in children)
+                LibraryItems.Add(child);
+
+            return children.Count > 0;
+        }
+
+        private bool AddLibraryDirectoryEntriesToBuffer(string folderPath, int level, List<LibraryEntry> buffer, bool includeCurrentFolderRow)
+        {
+            bool isExpanded = expandedLibraryFolders.Contains(folderPath);
+            var children = new List<LibraryEntry>();
+
             foreach (string dir in Directory.EnumerateDirectories(folderPath).OrderBy(Path.GetFileName))
-                AddLibraryDirectoryEntries(dir, level, includeCurrentFolderRow: true);
+                AddLibraryDirectoryEntriesToBuffer(dir, level + 1, children, includeCurrentFolderRow: true);
 
             foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
-                AddLibraryFileEntry(file, level);
+            {
+                if (FileMatchesCategory(file))
+                    children.Add(CreateLibraryFileEntry(file, level + 1));
+            }
+
+            bool shouldShowFolder = !IsCategoryFilterActive() || children.Count > 0;
+            if (!shouldShowFolder)
+                return false;
+
+            buffer.Add(new LibraryEntry
+            {
+                DisplayName = Path.GetFileName(folderPath),
+                FullPath = folderPath,
+                IsFolder = true,
+                IsExpanded = isExpanded,
+                Icon = isExpanded ? "📂" : "📁",
+                Level = level,
+                IsSearchMatch = false
+            });
+
+            if (isExpanded)
+                buffer.AddRange(children);
+
+            return true;
         }
 
         private bool AddLibrarySearchEntries(string folderPath, int level, bool includeCurrentFolderRow, string query)
@@ -240,7 +404,7 @@ namespace Media
 
             if (folderNameMatches)
             {
-                AddFullDirectoryTreeToBuffer(folderPath, level + (includeRoot ? 1 : 0), children);
+                AddFullDirectoryTreeToBuffer(folderPath, level + (includeRoot ? 1 : 0), children, query);
             }
             else
             {
@@ -249,12 +413,12 @@ namespace Media
 
                 foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
                 {
-                    if (TextMatchesSearch(Path.GetFileName(file), query))
+                    if (FileMatchesCategory(file) && TextMatchesSearch(Path.GetFileName(file), query))
                         children.Add(CreateLibraryFileEntry(file, level + (includeRoot ? 1 : 0), query));
                 }
             }
 
-            if (children.Count == 0 && !folderNameMatches)
+            if (children.Count == 0 && (!folderNameMatches || IsCategoryFilterActive()))
                 return false;
 
             if (includeRoot)
@@ -275,24 +439,43 @@ namespace Media
             return true;
         }
 
-        private void AddFullDirectoryTreeToBuffer(string folderPath, int level, List<LibraryEntry> buffer)
+        private bool AddFullDirectoryTreeToBuffer(string folderPath, int level, List<LibraryEntry> buffer, string? searchQuery = null)
         {
+            bool addedAny = false;
+
             foreach (string dir in Directory.EnumerateDirectories(folderPath).OrderBy(Path.GetFileName))
             {
-                buffer.Add(new LibraryEntry
+                var children = new List<LibraryEntry>();
+                bool childHasItems = AddFullDirectoryTreeToBuffer(dir, level + 1, children, searchQuery);
+                bool folderMatches = !string.IsNullOrWhiteSpace(searchQuery) && TextMatchesSearch(Path.GetFileName(dir), searchQuery);
+
+                if (folderMatches || childHasItems)
                 {
-                    DisplayName = Path.GetFileName(dir),
-                    FullPath = dir,
-                    IsFolder = true,
-                    IsExpanded = true,
-                    Icon = "📂",
-                    Level = level
-                });
-                AddFullDirectoryTreeToBuffer(dir, level + 1, buffer);
+                    buffer.Add(new LibraryEntry
+                    {
+                        DisplayName = Path.GetFileName(dir),
+                        FullPath = dir,
+                        IsFolder = true,
+                        IsExpanded = true,
+                        Icon = "📂",
+                        Level = level,
+                        IsSearchMatch = folderMatches
+                    });
+                    buffer.AddRange(children);
+                    addedAny = true;
+                }
             }
 
             foreach (string file in Directory.EnumerateFiles(folderPath).Where(IsSupportedAudioFile).OrderBy(Path.GetFileName))
-                buffer.Add(CreateLibraryFileEntry(file, level));
+            {
+                if (FileMatchesCategory(file))
+                {
+                    buffer.Add(CreateLibraryFileEntry(file, level, searchQuery));
+                    addedAny = true;
+                }
+            }
+
+            return addedAny;
         }
 
         private void AddLibraryFileEntry(string file, int level) => LibraryItems.Add(CreateLibraryFileEntry(file, level));
@@ -312,10 +495,15 @@ namespace Media
 
         private void RefreshLibrary_Click(object sender, RoutedEventArgs e)
         {
+            libraryGenresLoaded = false;
+            libraryGenreCache.Clear();
+
             if (string.IsNullOrWhiteSpace(currentLibraryPath))
                 LoadLibraryBrowser();
             else
                 LoadLibraryFolder(currentLibraryPath);
+
+            _ = LoadLibraryGenresAsync();
         }
 
         private void LibraryBackButton_Click(object sender, RoutedEventArgs e)
@@ -648,6 +836,7 @@ namespace Media
                 string album = string.IsNullOrWhiteSpace(tagFile.Tag.Album) ? "-" : tagFile.Tag.Album.Trim();
                 string year = tagFile.Tag.Year > 0 ? tagFile.Tag.Year.ToString() : "-";
                 string number = tagFile.Tag.Track > 0 ? tagFile.Tag.Track.ToString() : "-";
+                string genre = tagFile.Tag.Genres?.FirstOrDefault(g => !string.IsNullOrWhiteSpace(g))?.Trim() ?? "-";
                 double duration = tagFile.Properties.Duration.TotalSeconds;
 
                 return new SongMetadata
@@ -662,6 +851,7 @@ namespace Media
                     Year = year,
                     Duration = duration,
                     DurationText = duration > 0 ? FormatTime(duration) : "-",
+                    Genre = genre,
                     Cover = cover,
                     ListTitle = string.IsNullOrWhiteSpace(artist) || artist == "Nieznany autor" ? title : $"{title} - {artist}"
                 };
@@ -686,6 +876,7 @@ namespace Media
                 Year = "-",
                 Duration = 0,
                 DurationText = "-",
+                Genre = "-",
                 Cover = null,
                 ListTitle = Path.GetFileName(filePath)
             };
@@ -1066,7 +1257,7 @@ namespace Media
             if (suppressSearchTextChanged || string.IsNullOrWhiteSpace(currentLibraryPath)) return;
 
             // Debounce: nie przebudowuj całej biblioteki po każdym znaku od razu,
-            // tylko poczekaj 1 sekundę od ostatniego znaku, aż użytkownik przestanie pisać.
+            // tylko poczekaj 0,5 sekundy od ostatniego znaku, aż użytkownik przestanie pisać.
             librarySearchTimer.Stop();
             librarySearchTimer.Start();
         }
@@ -1114,7 +1305,166 @@ namespace Media
             }
         }
 
-        private void Category_Click(object sender, RoutedEventArgs e) { }
+        private async void Category_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.DataContext is not CategoryEntry entry)
+                return;
+
+            int clickedIndex = CategoryItems.IndexOf(entry);
+            if (clickedIndex < 0)
+                return;
+
+            bool isAll = string.Equals(entry.DisplayName, "Wszystkie", StringComparison.OrdinalIgnoreCase);
+            ModifierKeys modifiers = Keyboard.Modifiers;
+
+            if (isAll || modifiers == ModifierKeys.None)
+            {
+                selectedCategories.Clear();
+                selectedCategories.Add(entry.DisplayName);
+            }
+            else if ((modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+            {
+                selectedCategories.Remove("Wszystkie");
+
+                int startIndex = Math.Max(1, Math.Min(lastSelectedCategoryIndex, clickedIndex));
+                int endIndex = Math.Max(1, Math.Max(lastSelectedCategoryIndex, clickedIndex));
+
+                for (int i = startIndex; i <= endIndex && i < CategoryItems.Count; i++)
+                {
+                    string name = CategoryItems[i].DisplayName;
+                    if (!string.Equals(name, "Wszystkie", StringComparison.OrdinalIgnoreCase))
+                        selectedCategories.Add(name);
+                }
+
+                if (selectedCategories.Count == 0)
+                    selectedCategories.Add(entry.DisplayName);
+            }
+            else if ((modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                selectedCategories.Remove("Wszystkie");
+
+                if (selectedCategories.Contains(entry.DisplayName))
+                    selectedCategories.Remove(entry.DisplayName);
+                else
+                    selectedCategories.Add(entry.DisplayName);
+
+                if (selectedCategories.Count == 0)
+                    selectedCategories.Add("Wszystkie");
+            }
+
+            lastSelectedCategoryIndex = clickedIndex;
+            selectedCategory = selectedCategories.Contains("Wszystkie")
+                ? "Wszystkie"
+                : string.Join(", ", selectedCategories);
+
+            UpdateCategoryButtons();
+
+            if (IsCategoryFilterActive() && !libraryGenresLoaded)
+                await LoadLibraryGenresAsync();
+
+            LoadLibraryFolder(currentLibraryPath);
+        }
+
+        private void CategoryToggle_Click(object sender, RoutedEventArgs e)
+        {
+            categoriesExpanded = !categoriesExpanded;
+
+            if (CategoriesItemsControl != null)
+                CategoriesItemsControl.Visibility = categoriesExpanded ? Visibility.Visible : Visibility.Collapsed;
+
+            if (CategoryToggleIcon != null)
+                CategoryToggleIcon.Text = categoriesExpanded ? "˄" : "˅";
+        }
+
+        private void UpdateCategoryButtons()
+        {
+            foreach (var category in CategoryItems)
+                category.IsSelected = selectedCategories.Contains(category.DisplayName);
+
+            var refreshed = CategoryItems.ToList();
+            CategoryItems.Clear();
+            foreach (var category in refreshed)
+                CategoryItems.Add(category);
+        }
+
+        private async Task LoadLibraryGenresAsync()
+        {
+            if (isLoadingLibraryGenres || string.IsNullOrWhiteSpace(libraryRootPath) || !Directory.Exists(libraryRootPath))
+                return;
+
+            isLoadingLibraryGenres = true;
+
+            try
+            {
+                var result = await Task.Run(() =>
+                {
+                    var genres = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+                    var fileGenres = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (string file in Directory.EnumerateFiles(libraryRootPath, "*.*", SearchOption.AllDirectories).Where(IsSupportedAudioFile))
+                    {
+                        string[] currentGenres = ReadGenres(file);
+                        fileGenres[file] = currentGenres;
+
+                        foreach (string genre in currentGenres)
+                            genres.Add(genre);
+                    }
+
+                    return (genres: genres.ToList(), fileGenres);
+                });
+
+                libraryGenreCache.Clear();
+                foreach (var pair in result.fileGenres)
+                    libraryGenreCache[pair.Key] = pair.Value;
+
+                libraryGenresLoaded = true;
+
+                selectedCategories.RemoveWhere(x =>
+                    !string.Equals(x, "Wszystkie", StringComparison.OrdinalIgnoreCase) &&
+                    !result.genres.Contains(x, StringComparer.CurrentCultureIgnoreCase));
+
+                if (selectedCategories.Count == 0)
+                    selectedCategories.Add("Wszystkie");
+
+                CategoryItems.Clear();
+                CategoryItems.Add(new CategoryEntry { DisplayName = "Wszystkie", IsSelected = selectedCategories.Contains("Wszystkie") });
+                foreach (string genre in result.genres)
+                    CategoryItems.Add(new CategoryEntry { DisplayName = genre, IsSelected = selectedCategories.Contains(genre) });
+
+                if (IsCategoryFilterActive())
+                    LoadLibraryFolder(currentLibraryPath);
+            }
+            finally
+            {
+                isLoadingLibraryGenres = false;
+            }
+        }
+
+        private string[] ReadGenres(string filePath)
+        {
+            try
+            {
+                using var tagFile = TagLib.File.Create(filePath);
+                return tagFile.Tag.Genres?
+                           .Where(g => !string.IsNullOrWhiteSpace(g))
+                           .Select(g => g.Trim())
+                           .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                           .ToArray()
+                       ?? Array.Empty<string>();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+
+        public class CategoryEntry
+        {
+            public string DisplayName { get; set; } = string.Empty;
+            public bool IsSelected { get; set; }
+            public string Background => IsSelected ? "#1ED760" : "#252B36";
+        }
 
         public class LibraryEntry
         {
@@ -1160,6 +1510,7 @@ namespace Media
             public string Artist { get; set; } = string.Empty;
             public string Year { get; set; } = "-";
             public string DurationText { get; set; } = "-";
+            public string Genre { get; set; } = "-";
             public string ListTitle { get; set; } = string.Empty;
             public double Duration { get; set; }
             public BitmapImage? Cover { get; set; }

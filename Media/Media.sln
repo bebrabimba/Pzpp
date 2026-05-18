@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35312.102
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Media", "Media.csproj", "{901DCC64-2E71-446F-8B01-93EF0CFF32BF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Media", "Media.csproj", "{901DCC64-2E71-446F-8B01-93EF0CFF32BF}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "Muzyczka_Setup", "..\Muzyczka_Setup\Muzyczka_Setup.vdproj", "{C6F2E748-C6CA-4AA2-889A-96A22B517B87}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,8 @@ Global
 		{901DCC64-2E71-446F-8B01-93EF0CFF32BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{901DCC64-2E71-446F-8B01-93EF0CFF32BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{901DCC64-2E71-446F-8B01-93EF0CFF32BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6F2E748-C6CA-4AA2-889A-96A22B517B87}.Debug|Any CPU.ActiveCfg = Debug
+		{C6F2E748-C6CA-4AA2-889A-96A22B517B87}.Release|Any CPU.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

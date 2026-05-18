@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Media</id>
+    <version>1.0.0</version>
+    <authors>Media</authors>
+    <description>Package Description</description>
+    <repository type="git" commit="8607e407f933c146482a11d51f925924883fb99c" />
+    <dependencies>
+      <group targetFramework="net8.0-windows7.0">
+        <dependency id="TagLibSharp" version="2.3.0" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+    <frameworkReferences>
+      <group targetFramework="net8.0-windows7.0">
+        <frameworkReference name="Microsoft.WindowsDesktop.App.WPF" />
+      </group>
+    </frameworkReferences>
+  </metadata>
+  <files>
+    <file src="C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Media.runtimeconfig.json" target="lib\net8.0-windows7.0\Media.runtimeconfig.json" />
+    <file src="C:\xampp\htdocs\Pzpp\Media\bin\Debug\net8.0-windows\Media.dll" target="lib\net8.0-windows7.0\Media.dll" />
+  </files>
+</package>

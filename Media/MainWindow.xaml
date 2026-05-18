@@ -130,7 +130,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,8,0,20" VerticalAlignment="Center">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,8,0,20" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="♪" FontSize="30" Foreground="White" FontWeight="Bold" Margin="0,0,10,0"/>
                         <TextBlock Text="Muzyczka" FontSize="21" Foreground="White" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -234,15 +234,48 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <TextBlock Text="Kategorie" Foreground="White" FontSize="20" FontWeight="Bold" Margin="0,0,0,14"/>
-                <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,18">
-                    <Button Content="Wszystkie" Background="{StaticResource Accent}" Click="Category_Click"/>
-                    <Button Content="Pop" Margin="10,0,0,0" Click="Category_Click"/>
-                    <Button Content="Rock" Margin="10,0,0,0" Click="Category_Click"/>
-                    <Button Content="Hip-Hop" Margin="10,0,0,0" Click="Category_Click"/>
-                    <Button Content="Jazz" Margin="10,0,0,0" Click="Category_Click"/>
-                    <Button Content="Electronic" Margin="10,0,0,0" Click="Category_Click"/>
-                </WrapPanel>
+                <Grid Grid.Row="0" Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Kategorie" Foreground="White" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button x:Name="CategoryToggleButton"
+                            Grid.Column="1"
+                            Width="30"
+                            Height="28"
+                            Padding="0"
+                            Margin="10,0,0,0"
+                            Background="#252B36"
+                            ToolTip="Zwiń / rozwiń kategorie"
+                            Click="CategoryToggle_Click">
+                        <TextBlock x:Name="CategoryToggleIcon"
+                                   Text="˄"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   TextAlignment="Center"
+                                   LineHeight="16"
+                                   LineStackingStrategy="BlockLineHeight"/>
+                    </Button>
+                </Grid>
+                <ItemsControl x:Name="CategoriesItemsControl" Grid.Row="1" ItemsSource="{Binding CategoryItems}" Margin="0,0,0,18">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding DisplayName}"
+                                    Background="{Binding Background}"
+                                    Margin="0,0,10,8"
+                                    Click="Category_Click"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <Border Grid.Row="2" Background="#171C24" CornerRadius="12" BorderBrush="{StaticResource Line}" BorderThickness="1">
                     <Grid Margin="14">
                         <Grid.RowDefinitions>
@@ -369,7 +402,7 @@
 
                     <Border Grid.Row="0" Background="#202632" CornerRadius="8" BorderBrush="#303848" BorderThickness="1" ClipToBounds="True">
                         <Grid>
-                            <Image x:Name="AlbumArtImage" Stretch="UniformToFill" Visibility="Collapsed"/>
+                            <Image x:Name="AlbumArtImage" Stretch="Uniform" Visibility="Collapsed"/>
                             <TextBlock x:Name="AlbumArtPlaceholder" Text="♪" FontSize="80" Foreground="#687282" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
